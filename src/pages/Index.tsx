@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { GameBoard } from '@/components/game/GameBoard';
 import { GameStats } from '@/components/game/GameStats';
@@ -8,19 +8,24 @@ import { LANGameModal } from '@/components/game/LANGameModal';
 import { ConnectionStatus } from '@/components/game/ConnectionStatus';
 import { GameChat } from '@/components/game/GameChat';
 import { RematchDialog } from '@/components/game/RematchDialog';
+import WelcomeScreen from '@/components/game/WelcomeScreen';
 import { useGameLogic } from '@/hooks/useGameLogic';
 import { useLANMultiplayer, GameState, PlayerRole, TimerSettings, MoveAnimation } from '@/hooks/useLANMultiplayer';
 import { useTurnTimer } from '@/hooks/useTurnTimer';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { Menu, RotateCcw } from 'lucide-react';
 import tigerIcon from '@/assets/tiger-icon.png';
 import goatIcon from '@/assets/goat-icon.png';
 
 const Index = () => {
-  const [rulesOpen, setRulesOpen] = useState(true);
+  const isMobile = useIsMobile();
+  const [showWelcome, setShowWelcome] = useState(true);
+  const [rulesOpen, setRulesOpen] = useState(false);
   const [lanModalOpen, setLanModalOpen] = useState(false);
   const [lanPlayerRole, setLanPlayerRole] = useState<PlayerRole | null>(null);
   const [lastMoveAnimation, setLastMoveAnimation] = useState<MoveAnimation | null>(null);
+  const justMadeMove = useRef(false);
 
   const {
     tigers,
@@ -135,7 +140,8 @@ const Index = () => {
   
   // Send game state after each move in LAN mode
   useEffect(() => {
-    if (isLANMode && effectiveRole !== currentTurn && !isSpectator) {
+    // Only send if we just made a move
+    if (isLANMode && justMadeMove.current && !isSpectator) {
       // Detect the move that was made
       let moveAnimation: MoveAnimation | undefined;
       
@@ -212,6 +218,9 @@ const Index = () => {
         matchScore,
         spectators,
       });
+      
+      // Reset the flag after sending
+      justMadeMove.current = false;
     }
     
     setPrevPositions({ tigers, goats });
@@ -273,6 +282,8 @@ const Index = () => {
   // Wrap handlers to check if it's player's turn in LAN mode
   const wrappedHandleNodeClick = useCallback((row: number, col: number) => {
     if (isLANMode && (!isMyTurn || isSpectator)) return;
+    // Mark that we're making a move so the sync effect knows to send state
+    justMadeMove.current = true;
     handleNodeClick(row, col);
   }, [isLANMode, isMyTurn, isSpectator, handleNodeClick]);
 
@@ -281,8 +292,30 @@ const Index = () => {
     handlePieceSelect(piece);
   }, [isLANMode, isMyTurn, isSpectator, handlePieceSelect]);
 
+  // Handle welcome screen mode selection
+  const handleWelcomeModeSelect = useCallback((mode: 'ai' | 'local' | 'online') => {
+    setShowWelcome(false);
+    if (mode === 'ai') {
+      setGameMode('vs-computer');
+    } else if (mode === 'local') {
+      setGameMode('pvp');
+    } else if (mode === 'online') {
+      setLanModalOpen(true);
+    }
+    resetGame();
+  }, [setGameMode, resetGame]);
+
   return (
-    <SidebarProvider>
+    <>
+      {/* Welcome Screen for first-time/mobile users */}
+      {showWelcome && (
+        <WelcomeScreen
+          onSelectMode={handleWelcomeModeSelect}
+          onClose={() => setShowWelcome(false)}
+        />
+      )}
+      
+      <SidebarProvider>
       <div className="min-h-screen flex w-full">
         <GameSidebar 
           currentMode={gameMode}
@@ -350,17 +383,21 @@ const Index = () => {
                     {currentTurn === 'tiger' ? 'Tiger' : 'Goat'}
                   </span>
                 </div>
-                {goatsToPlace > 0 && currentTurn === 'goat' && !isAIThinking && (
-                  <span className="text-xs text-muted-foreground hidden sm:inline">
-                    (Place a goat)
-                  </span>
-                )}
-                {isAIThinking && (
-                  <span className="text-xs sm:text-sm text-primary animate-pulse">
-                    AI...
-                  </span>
-                )}
-              </div>
+              {goatsToPlace > 0 && currentTurn === 'goat' && !isAIThinking && (
+                <span className="text-xs text-muted-foreground hidden sm:inline">
+                  (Place a goat)
+                </span>
+              )}
+              {isLANMode && !isMyTurn && !isSpectator ? (
+                <span className="text-xs sm:text-sm text-primary animate-pulse">
+                  {opponentName || 'Opponent'} thinking...
+                </span>
+              ) : isAIThinking ? (
+                <span className="text-xs sm:text-sm text-primary animate-pulse">
+                  AI thinking...
+                </span>
+              ) : null}
+            </div>
 
               {/* Game Board */}
               <GameBoard
@@ -461,6 +498,7 @@ const Index = () => {
         />
       </div>
     </SidebarProvider>
+    </>
   );
 };
 

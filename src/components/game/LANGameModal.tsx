@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Wifi, Loader2, ArrowRight, Copy, Check, Eye } from 'lucide-react';
+import { Globe, Loader2, ArrowRight, Copy, Check, Eye } from 'lucide-react';
 import { ConnectionState, PlayerRole, TimerSettings } from '@/hooks/useLANMultiplayer';
 import tigerIcon from '@/assets/tiger-icon.png';
 import goatIcon from '@/assets/goat-icon.png';
@@ -99,10 +99,10 @@ export function LANGameModal({
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Wifi className="w-5 h-5" />
-              LAN Multiplayer
-            </DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <Globe className="w-5 h-5 text-primary" />
+            Online Multiplayer
+          </DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4">
@@ -118,7 +118,7 @@ export function LANGameModal({
             </div>
 
             <p className="text-sm text-muted-foreground text-center">
-              Play with a friend
+              Play with anyone worldwide - share the code!
             </p>
 
             <div className="grid grid-cols-2 gap-3">
