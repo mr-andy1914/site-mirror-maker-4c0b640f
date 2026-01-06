@@ -1,5 +1,5 @@
 import { Button } from '@/components/ui/button';
-import { User, Monitor, RotateCcw, BookOpen, Volume2, VolumeX, Wifi } from 'lucide-react';
+import { User, Monitor, RotateCcw, BookOpen, Volume2, VolumeX, Globe, Check } from 'lucide-react';
 import tigerIcon from '@/assets/tiger-icon.png';
 import goatIcon from '@/assets/goat-icon.png';
 import { GameMode, AIDifficulty } from '@/hooks/useGameLogic';
@@ -99,14 +99,27 @@ export function GameSidebar({
                       onNewGame();
                     }}
                     isActive={currentMode === mode}
-                    className="w-full"
+                    className={`w-full transition-all duration-200 ${
+                      currentMode === mode 
+                        ? 'bg-primary/15 ring-2 ring-primary/40 scale-[1.02]' 
+                        : ''
+                    }`}
                   >
                     <div className="flex items-center gap-3 w-full">
-                      <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
+                        currentMode === mode ? 'bg-primary/30 text-primary' : 'bg-primary/20 text-primary'
+                      }`}>
                         {icon}
                       </div>
                       <div className="text-left flex-1">
-                        <div className="font-medium text-sm">{label}</div>
+                        <div className={`font-medium text-sm flex items-center gap-1.5 ${
+                          currentMode === mode ? 'text-primary' : ''
+                        }`}>
+                          {label}
+                          {currentMode === mode && (
+                            <Check className="w-3 h-3 text-primary" />
+                          )}
+                        </div>
                         <div className="text-xs text-muted-foreground">{description}</div>
                       </div>
                     </div>
@@ -176,8 +189,8 @@ export function GameSidebar({
           className="w-full"
           onClick={onOpenLAN}
         >
-          <Wifi className="w-4 h-4 mr-2" />
-          Play LAN
+          <Globe className="w-4 h-4 mr-2" />
+          Play Online
         </Button>
         <Button 
           variant="outline" 
