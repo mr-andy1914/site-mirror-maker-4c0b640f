@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
-import { Bot, Users, Globe, Gamepad2 } from 'lucide-react';
+import { Bot, Users, Globe, Gamepad2, Download } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { usePWAInstall } from '@/hooks/usePWAInstall';
 
 interface WelcomeScreenProps {
   onSelectMode: (mode: 'ai' | 'local' | 'online') => void;
@@ -12,6 +13,7 @@ interface WelcomeScreenProps {
 const WelcomeScreen = ({ onSelectMode, onClose }: WelcomeScreenProps) => {
   const isMobile = useIsMobile();
   const [isOpen, setIsOpen] = useState(true);
+  const { isPWAInstallable, isInstalled, installApp } = usePWAInstall();
 
   // Check if user has dismissed welcome before
   useEffect(() => {
@@ -96,6 +98,23 @@ const WelcomeScreen = ({ onSelectMode, onClose }: WelcomeScreenProps) => {
                 <span className="text-xs text-muted-foreground">Connect with anyone worldwide</span>
               </div>
             </Button>
+
+            {/* Install App Button */}
+            {isPWAInstallable && !isInstalled && (
+              <Button
+                variant="secondary"
+                className="w-full h-12 justify-start gap-4 mt-2"
+                onClick={installApp}
+              >
+                <div className="p-2 rounded-lg bg-primary/10">
+                  <Download className="h-5 w-5 text-primary" />
+                </div>
+                <div className="flex flex-col items-start">
+                  <span className="font-semibold">Install App</span>
+                  <span className="text-xs text-muted-foreground">Add to home screen</span>
+                </div>
+              </Button>
+            )}
           </div>
 
           {/* Skip button */}
