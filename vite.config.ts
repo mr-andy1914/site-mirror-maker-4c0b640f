@@ -15,7 +15,7 @@ export default defineConfig(({ mode }) => ({
     mode === "development" && componentTagger(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["favicon.ico", "robots.txt"],
+      includeAssets: ["robots.txt", "pwa-192x192.png", "pwa-512x512.png"],
       manifest: {
         name: "Bagchal - Tiger & Goat",
         short_name: "Bagchal",

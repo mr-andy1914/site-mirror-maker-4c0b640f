@@ -1,9 +1,10 @@
 import { Button } from '@/components/ui/button';
-import { User, Monitor, RotateCcw, BookOpen, Volume2, VolumeX, Globe, Check } from 'lucide-react';
+import { User, Monitor, RotateCcw, BookOpen, Volume2, VolumeX, Globe, Check, Download } from 'lucide-react';
 import tigerIcon from '@/assets/tiger-icon.png';
 import goatIcon from '@/assets/goat-icon.png';
 import { GameMode, AIDifficulty } from '@/hooks/useGameLogic';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { usePWAInstall } from '@/hooks/usePWAInstall';
 import {
   Sidebar,
   SidebarContent,
@@ -42,6 +43,7 @@ export function GameSidebar({
   onOpenRules,
   onOpenLAN,
 }: GameSidebarProps) {
+  const { isPWAInstallable, isInstalled, installApp } = usePWAInstall();
   const modes: { mode: GameMode; label: string; icon: React.ReactNode; description: string }[] = [
     {
       mode: 'pvp',
@@ -183,6 +185,17 @@ export function GameSidebar({
       </SidebarContent>
       
       <SidebarFooter className="p-4 space-y-2 border-t border-border/50">
+        {isPWAInstallable && !isInstalled && (
+          <Button 
+            variant="outline"
+            size="sm"
+            className="w-full"
+            onClick={installApp}
+          >
+            <Download className="w-4 h-4 mr-2" />
+            Install App
+          </Button>
+        )}
         <Button 
           variant={isLANMode ? "default" : "outline"}
           size="sm"
