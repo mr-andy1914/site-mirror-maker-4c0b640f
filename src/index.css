@@ -1,0 +1,153 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@400;500;600&display=swap');
+
+@layer base {
+  :root {
+    /* Light theme */
+    --background: 40 30% 95%;
+    --foreground: 25 30% 15%;
+
+    --card: 40 25% 92%;
+    --card-foreground: 25 30% 15%;
+
+    --popover: 40 25% 94%;
+    --popover-foreground: 25 30% 15%;
+
+    --primary: 38 92% 45%;
+    --primary-foreground: 40 30% 98%;
+
+    --secondary: 35 20% 85%;
+    --secondary-foreground: 25 30% 20%;
+
+    --muted: 35 15% 88%;
+    --muted-foreground: 25 15% 45%;
+
+    --accent: 16 85% 50%;
+    --accent-foreground: 40 30% 98%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 40 30% 98%;
+
+    --border: 35 20% 82%;
+    --input: 35 20% 82%;
+    --ring: 38 92% 45%;
+
+    --radius: 0.75rem;
+
+    /* Custom game colors - Light */
+    --tiger: 25 95% 45%;
+    --goat: 35 70% 40%;
+    --board-bg: 40 30% 88%;
+    --board-line: 30 40% 45%;
+    --node: 38 80% 40%;
+    --node-glow: 38 100% 50%;
+
+    /* Gradients - Light */
+    --gradient-gold: linear-gradient(135deg, hsl(38, 92%, 45%), hsl(25, 85%, 50%));
+    --gradient-dark: linear-gradient(180deg, hsl(40, 30%, 95%), hsl(40, 25%, 90%));
+    --gradient-card: linear-gradient(145deg, hsl(40, 25%, 94%), hsl(40, 20%, 90%));
+
+    /* Shadows - Light */
+    --shadow-gold: 0 0 30px hsl(38, 92%, 50%, 0.25);
+    --shadow-card: 0 8px 32px hsl(25, 30%, 20%, 0.1);
+  }
+
+  .dark {
+    --background: 20 14% 8%;
+    --foreground: 45 30% 90%;
+
+    --card: 20 12% 12%;
+    --card-foreground: 45 30% 90%;
+
+    --popover: 20 12% 10%;
+    --popover-foreground: 45 30% 90%;
+
+    --primary: 38 92% 50%;
+    --primary-foreground: 20 14% 8%;
+
+    --secondary: 25 20% 18%;
+    --secondary-foreground: 45 30% 90%;
+
+    --muted: 20 15% 15%;
+    --muted-foreground: 30 10% 55%;
+
+    --accent: 16 85% 55%;
+    --accent-foreground: 45 30% 95%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 45 30% 95%;
+
+    --border: 30 15% 20%;
+    --input: 30 15% 20%;
+    --ring: 38 92% 50%;
+
+    /* Custom game colors - Dark */
+    --tiger: 25 95% 53%;
+    --goat: 45 80% 70%;
+    --board-bg: 30 25% 12%;
+    --board-line: 38 60% 35%;
+    --node: 38 92% 50%;
+    --node-glow: 38 100% 60%;
+
+    /* Gradients - Dark */
+    --gradient-gold: linear-gradient(135deg, hsl(38, 92%, 50%), hsl(25, 95%, 55%));
+    --gradient-dark: linear-gradient(180deg, hsl(20, 14%, 8%), hsl(20, 12%, 5%));
+    --gradient-card: linear-gradient(145deg, hsl(20, 12%, 14%), hsl(20, 12%, 10%));
+
+    /* Shadows - Dark */
+    --shadow-gold: 0 0 30px hsl(38, 92%, 50%, 0.3);
+    --shadow-card: 0 8px 32px hsl(0, 0%, 0%, 0.4);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    background: var(--gradient-dark);
+    min-height: 100vh;
+  }
+
+  h1, h2, h3, h4 {
+    @apply font-display;
+  }
+}
+
+@layer utilities {
+  .text-gradient {
+    @apply bg-clip-text text-transparent;
+    background-image: var(--gradient-gold);
+  }
+
+  .glow-gold {
+    box-shadow: var(--shadow-gold);
+  }
+
+  .card-gradient {
+    background: var(--gradient-card);
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: hsl(var(--muted));
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--primary) / 0.5);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--primary));
+}

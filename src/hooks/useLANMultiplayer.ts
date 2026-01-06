@@ -1,0 +1,432 @@
+import { useState, useCallback, useRef, useEffect } from 'react';
+import Peer, { DataConnection } from 'peerjs';
+import { Piece, Position } from './useGameLogic';
+
+export type ConnectionState = 'idle' | 'creating' | 'waiting' | 'joining' | 'connected' | 'disconnected';
+export type PlayerRole = 'tiger' | 'goat' | 'spectator';
+
+export interface PlayerInfo {
+  name: string;
+  role: PlayerRole;
+}
+
+export interface MoveAnimation {
+  pieceType: 'tiger' | 'goat';
+  from: Position;
+  to: Position;
+  capturedAt?: Position;
+}
+
+export interface ChatMessage {
+  id: string;
+  sender: string;
+  text: string;
+  timestamp: number;
+  isEmoji?: boolean;
+}
+
+export interface TimerSettings {
+  enabled: boolean;
+  seconds: number; // 15, 30, 60, or 0 for unlimited
+}
+
+export interface MatchScore {
+  host: number;
+  guest: number;
+}
+
+export interface GameState {
+  tigers: Piece[];
+  goats: Piece[];
+  goatsToPlace: number;
+  goatsCaptured: number;
+  currentTurn: 'tiger' | 'goat';
+  gameOver: string | null;
+  hostRole?: PlayerRole;
+  hostPlayer?: PlayerInfo;
+  guestPlayer?: PlayerInfo;
+  lastMove?: MoveAnimation;
+  timerSettings?: TimerSettings;
+  timerValue?: number;
+  matchScore?: MatchScore;
+  spectators?: string[];
+}
+
+export type MessageType = 'game_state' | 'chat' | 'rematch_request' | 'rematch_response' | 'timer_sync' | 'player_info' | 'spectator_join';
+
+export interface PeerMessage {
+  type: MessageType;
+  payload: any;
+}
+
+interface LANMultiplayerReturn {
+  connectionState: ConnectionState;
+  playerRole: PlayerRole | null;
+  roomCode: string;
+  error: string | null;
+  isHost: boolean;
+  playerName: string;
+  opponentName: string;
+  chatMessages: ChatMessage[];
+  timerSettings: TimerSettings;
+  timerValue: number;
+  matchScore: MatchScore;
+  rematchRequested: boolean;
+  rematchRequestedBy: 'host' | 'guest' | null;
+  spectators: string[];
+  lastMove: MoveAnimation | null;
+  createRoom: (role: PlayerRole, name: string, timer: TimerSettings) => void;
+  joinRoom: (code: string, name: string, asSpectator?: boolean) => void;
+  sendGameState: (state: GameState) => void;
+  sendChatMessage: (text: string, isEmoji?: boolean) => void;
+  requestRematch: () => void;
+  respondToRematch: (accept: boolean) => void;
+  syncTimer: (value: number) => void;
+  disconnect: () => void;
+  onReceiveGameState: (callback: (state: GameState) => void) => void;
+  setPlayerName: (name: string) => void;
+}
+
+const generateRoomCode = (): string => {
+  return Math.floor(10000 + Math.random() * 90000).toString();
+};
+
+const generateMessageId = (): string => {
+  return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+};
+
+export function useLANMultiplayer(): LANMultiplayerReturn {
+  const [connectionState, setConnectionState] = useState<ConnectionState>('idle');
+  const [playerRole, setPlayerRole] = useState<PlayerRole | null>(null);
+  const [roomCode, setRoomCode] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [isHost, setIsHost] = useState(false);
+  const [playerName, setPlayerName] = useState('');
+  const [opponentName, setOpponentName] = useState('');
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [timerSettings, setTimerSettings] = useState<TimerSettings>({ enabled: false, seconds: 30 });
+  const [timerValue, setTimerValue] = useState(30);
+  const [matchScore, setMatchScore] = useState<MatchScore>({ host: 0, guest: 0 });
+  const [rematchRequested, setRematchRequested] = useState(false);
+  const [rematchRequestedBy, setRematchRequestedBy] = useState<'host' | 'guest' | null>(null);
+  const [spectators, setSpectators] = useState<string[]>([]);
+  const [lastMove, setLastMove] = useState<MoveAnimation | null>(null);
+
+  const peerRef = useRef<Peer | null>(null);
+  const connectionRef = useRef<DataConnection | null>(null);
+  const spectatorConnectionsRef = useRef<DataConnection[]>([]);
+  const gameStateCallbackRef = useRef<((state: GameState) => void) | null>(null);
+
+  const cleanup = useCallback(() => {
+    spectatorConnectionsRef.current.forEach(conn => conn.close());
+    spectatorConnectionsRef.current = [];
+    if (connectionRef.current) {
+      connectionRef.current.close();
+      connectionRef.current = null;
+    }
+    if (peerRef.current) {
+      peerRef.current.destroy();
+      peerRef.current = null;
+    }
+  }, []);
+
+  const sendMessage = useCallback((message: PeerMessage) => {
+    if (connectionRef.current && connectionRef.current.open) {
+      connectionRef.current.send(message);
+    }
+    // Also send to spectators if host
+    spectatorConnectionsRef.current.forEach(conn => {
+      if (conn.open) {
+        conn.send(message);
+      }
+    });
+  }, []);
+
+  const handleMessage = useCallback((data: PeerMessage, fromSpectator = false) => {
+    switch (data.type) {
+      case 'game_state':
+        if (data.payload.lastMove) {
+          setLastMove(data.payload.lastMove);
+          setTimeout(() => setLastMove(null), 400);
+        }
+        if (gameStateCallbackRef.current) {
+          gameStateCallbackRef.current(data.payload);
+        }
+        break;
+      case 'chat':
+        setChatMessages(prev => [...prev, data.payload as ChatMessage]);
+        break;
+      case 'rematch_request':
+        setRematchRequested(true);
+        setRematchRequestedBy(data.payload.from);
+        break;
+      case 'rematch_response':
+        if (data.payload.accepted) {
+          setRematchRequested(false);
+          setRematchRequestedBy(null);
+        } else {
+          setRematchRequested(false);
+          setRematchRequestedBy(null);
+        }
+        break;
+      case 'timer_sync':
+        setTimerValue(data.payload.value);
+        break;
+      case 'player_info':
+        setOpponentName(data.payload.name);
+        if (!fromSpectator && data.payload.timerSettings) {
+          setTimerSettings(data.payload.timerSettings);
+          setTimerValue(data.payload.timerSettings.seconds);
+        }
+        break;
+      case 'spectator_join':
+        if (!fromSpectator) {
+          setSpectators(prev => [...prev, data.payload.name]);
+        }
+        break;
+    }
+  }, []);
+
+  const setupConnection = useCallback((conn: DataConnection, isSpectatorConn = false) => {
+    if (isSpectatorConn) {
+      spectatorConnectionsRef.current.push(conn);
+    } else {
+      connectionRef.current = conn;
+    }
+
+    conn.on('open', () => {
+      console.log('Connection opened');
+      if (!isSpectatorConn) {
+        setConnectionState('connected');
+        setError(null);
+        // Send player info
+        sendMessage({
+          type: 'player_info',
+          payload: { name: playerName, timerSettings }
+        });
+      }
+    });
+
+    conn.on('data', (data) => {
+      try {
+        handleMessage(data as PeerMessage, isSpectatorConn);
+      } catch (e) {
+        console.error('Failed to parse message:', e);
+      }
+    });
+
+    conn.on('close', () => {
+      console.log('Connection closed');
+      if (!isSpectatorConn) {
+        setConnectionState('disconnected');
+      } else {
+        spectatorConnectionsRef.current = spectatorConnectionsRef.current.filter(c => c !== conn);
+        setSpectators(prev => prev.slice(0, -1)); // Simple removal, could be improved
+      }
+    });
+
+    conn.on('error', (err) => {
+      console.error('Connection error:', err);
+      if (!isSpectatorConn) {
+        setError('Connection error');
+        setConnectionState('disconnected');
+      }
+    });
+  }, [handleMessage, sendMessage, playerName, timerSettings]);
+
+  const createRoom = useCallback((role: PlayerRole, name: string, timer: TimerSettings) => {
+    cleanup();
+    setError(null);
+    setConnectionState('creating');
+    setIsHost(true);
+    setPlayerRole(role);
+    setPlayerName(name);
+    setTimerSettings(timer);
+    setTimerValue(timer.seconds);
+    setChatMessages([]);
+    setMatchScore({ host: 0, guest: 0 });
+    setSpectators([]);
+
+    const code = generateRoomCode();
+    const peerId = `bagchal-${code}`;
+
+    const peer = new Peer(peerId);
+    peerRef.current = peer;
+
+    peer.on('open', () => {
+      console.log('Host peer opened with ID:', peerId);
+      setRoomCode(code);
+      setConnectionState('waiting');
+    });
+
+    peer.on('connection', (conn) => {
+      console.log('Incoming connection');
+      // Check if it's a spectator (metadata would indicate)
+      const isSpectator = conn.metadata?.spectator === true;
+      setupConnection(conn, isSpectator);
+      
+      if (isSpectator) {
+        // Handle spectator connection
+        conn.on('open', () => {
+          conn.send({
+            type: 'player_info',
+            payload: { name, timerSettings: timer, isHost: true }
+          });
+        });
+      }
+    });
+
+    peer.on('error', (err) => {
+      console.error('Peer error:', err);
+      if (err.type === 'unavailable-id') {
+        setError('Room code in use, please try again');
+        setConnectionState('idle');
+      } else {
+        setError('Failed to create room');
+        setConnectionState('idle');
+      }
+    });
+  }, [cleanup, setupConnection]);
+
+  const joinRoom = useCallback((code: string, name: string, asSpectator = false) => {
+    cleanup();
+    setError(null);
+    setConnectionState('joining');
+    setIsHost(false);
+    setPlayerName(name);
+    setChatMessages([]);
+
+    if (asSpectator) {
+      setPlayerRole('spectator');
+    }
+
+    const peerId = `bagchal-${code}`;
+
+    const peer = new Peer();
+    peerRef.current = peer;
+
+    peer.on('open', () => {
+      console.log('Joiner peer opened, connecting to:', peerId);
+      const conn = peer.connect(peerId, { 
+        reliable: true,
+        metadata: { spectator: asSpectator }
+      });
+      
+      conn.on('open', () => {
+        // Send our info and whether we're a spectator
+        conn.send({
+          type: asSpectator ? 'spectator_join' : 'player_info',
+          payload: { name }
+        });
+      });
+      
+      setupConnection(conn, asSpectator);
+    });
+
+    peer.on('error', (err) => {
+      console.error('Peer error:', err);
+      if (err.type === 'peer-unavailable') {
+        setError('Room not found');
+      } else {
+        setError('Failed to join room');
+      }
+      setConnectionState('idle');
+    });
+  }, [cleanup, setupConnection]);
+
+  const sendGameState = useCallback((state: GameState) => {
+    sendMessage({ type: 'game_state', payload: state });
+  }, [sendMessage]);
+
+  const sendChatMessage = useCallback((text: string, isEmoji = false) => {
+    const message: ChatMessage = {
+      id: generateMessageId(),
+      sender: playerName,
+      text,
+      timestamp: Date.now(),
+      isEmoji
+    };
+    setChatMessages(prev => [...prev, message]);
+    sendMessage({ type: 'chat', payload: message });
+  }, [sendMessage, playerName]);
+
+  const requestRematch = useCallback(() => {
+    setRematchRequested(true);
+    setRematchRequestedBy(isHost ? 'host' : 'guest');
+    sendMessage({ 
+      type: 'rematch_request', 
+      payload: { from: isHost ? 'host' : 'guest' } 
+    });
+  }, [sendMessage, isHost]);
+
+  const respondToRematch = useCallback((accept: boolean) => {
+    sendMessage({ type: 'rematch_response', payload: { accepted: accept } });
+    if (accept) {
+      setRematchRequested(false);
+      setRematchRequestedBy(null);
+    } else {
+      setRematchRequested(false);
+      setRematchRequestedBy(null);
+    }
+  }, [sendMessage]);
+
+  const syncTimer = useCallback((value: number) => {
+    setTimerValue(value);
+    sendMessage({ type: 'timer_sync', payload: { value } });
+  }, [sendMessage]);
+
+  const disconnect = useCallback(() => {
+    cleanup();
+    setConnectionState('idle');
+    setPlayerRole(null);
+    setRoomCode('');
+    setError(null);
+    setIsHost(false);
+    setPlayerName('');
+    setOpponentName('');
+    setChatMessages([]);
+    setMatchScore({ host: 0, guest: 0 });
+    setRematchRequested(false);
+    setRematchRequestedBy(null);
+    setSpectators([]);
+    setLastMove(null);
+  }, [cleanup]);
+
+  const onReceiveGameState = useCallback((callback: (state: GameState) => void) => {
+    gameStateCallbackRef.current = callback;
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      cleanup();
+    };
+  }, [cleanup]);
+
+  return {
+    connectionState,
+    playerRole,
+    roomCode,
+    error,
+    isHost,
+    playerName,
+    opponentName,
+    chatMessages,
+    timerSettings,
+    timerValue,
+    matchScore,
+    rematchRequested,
+    rematchRequestedBy,
+    spectators,
+    lastMove,
+    createRoom,
+    joinRoom,
+    sendGameState,
+    sendChatMessage,
+    requestRematch,
+    respondToRematch,
+    syncTimer,
+    disconnect,
+    onReceiveGameState,
+    setPlayerName,
+  };
+}
