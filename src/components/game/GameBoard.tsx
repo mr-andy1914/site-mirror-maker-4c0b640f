@@ -37,6 +37,7 @@ export function GameBoard({
 }: GameBoardProps) {
   const [dimensions, setDimensions] = useState({ cellSize: 100, padding: 50 });
   const [animatingPiece, setAnimatingPiece] = useState<AnimatedPiece | null>(null);
+  const [animationKey, setAnimationKey] = useState(0); // Force re-render for animation
   const [fadingGoat, setFadingGoat] = useState<Position | null>(null);
   const prevTigersRef = useRef(tigers);
   const prevGoatsRef = useRef(goats);
@@ -131,6 +132,7 @@ export function GameBoard({
         animatingFrom: prevTigerPos,
       };
       setAnimatingPiece(piece);
+      setAnimationKey(k => k + 1); // Trigger fresh animation
       setTimeout(() => setAnimatingPiece(null), 350);
     }
     
@@ -316,14 +318,15 @@ export function GameBoard({
           
           {piece && !isFading && (
             <g 
+              key={isAnimating ? `anim-${animationKey}` : undefined}
               className={cn(
-                'transition-all duration-200',
                 isSelected && 'drop-shadow-[0_0_20px_hsl(var(--primary))]'
               )}
-              style={isAnimating ? {
-                transform: animationTransform,
-                transition: 'transform 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
-              } : undefined}
+              style={isAnimating && animatingPiece?.animatingFrom ? {
+                animation: 'piece-move 0.35s cubic-bezier(0.4, 0, 0.2, 1) forwards',
+                '--from-x': `${getNodePosition(animatingPiece.animatingFrom.row, animatingPiece.animatingFrom.col).x - x}px`,
+                '--from-y': `${getNodePosition(animatingPiece.animatingFrom.row, animatingPiece.animatingFrom.col).y - y}px`,
+              } as React.CSSProperties : undefined}
             >
               <image
                 href={piece.type === 'tiger' ? tigerIcon : goatIcon}
@@ -336,10 +339,6 @@ export function GameBoard({
                   isSelected && 'scale-110',
                   piece.type === currentTurn && !isAIThinking && 'cursor-pointer hover:scale-105'
                 )}
-                style={isAnimating ? {
-                  transform: 'none',
-                  transition: 'transform 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
-                } : undefined}
               />
               {isSelected && (
                 <circle
@@ -378,6 +377,16 @@ export function GameBoard({
               opacity="0.3"
             />
           </pattern>
+          <style>{`
+            @keyframes piece-move {
+              from {
+                transform: translate(var(--from-x), var(--from-y));
+              }
+              to {
+                transform: translate(0, 0);
+              }
+            }
+          `}</style>
         </defs>
         <rect width="100%" height="100%" fill="url(#grid)" />
         
