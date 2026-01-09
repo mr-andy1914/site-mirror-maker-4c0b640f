@@ -131,8 +131,13 @@ export function useLANMultiplayer(): LANMultiplayerReturn {
   }, []);
 
   const sendMessage = useCallback((message: PeerMessage) => {
-    if (connectionRef.current && connectionRef.current.open) {
-      connectionRef.current.send(message);
+    if (connectionRef.current) {
+      if (connectionRef.current.open) {
+        console.log('[LAN] Sending message:', message.type);
+        connectionRef.current.send(message);
+      } else {
+        console.warn('[LAN] Connection not open, cannot send:', message.type);
+      }
     }
     // Also send to spectators if host
     spectatorConnectionsRef.current.forEach(conn => {
@@ -143,8 +148,11 @@ export function useLANMultiplayer(): LANMultiplayerReturn {
   }, []);
 
   const handleMessage = useCallback((data: PeerMessage, fromSpectator = false) => {
+    console.log('[LAN] Received message:', data.type);
+    
     switch (data.type) {
       case 'game_state':
+        console.log('[LAN] Game state received, currentTurn:', data.payload.currentTurn);
         if (data.payload.lastMove) {
           setLastMove(data.payload.lastMove);
           setTimeout(() => setLastMove(null), 400);
@@ -178,6 +186,12 @@ export function useLANMultiplayer(): LANMultiplayerReturn {
           setTimerSettings(data.payload.timerSettings);
           setTimerValue(data.payload.timerSettings.seconds);
         }
+        // Set guest's role based on host's role
+        if (!fromSpectator && data.payload.hostRole) {
+          const guestRole = data.payload.hostRole === 'tiger' ? 'goat' : 'tiger';
+          console.log('[LAN] Setting guest role to:', guestRole);
+          setPlayerRole(guestRole);
+        }
         break;
       case 'spectator_join':
         if (!fromSpectator) {
@@ -195,14 +209,14 @@ export function useLANMultiplayer(): LANMultiplayerReturn {
     }
 
     conn.on('open', () => {
-      console.log('Connection opened');
+      console.log('[LAN] Connection opened, isHost:', isHost);
       if (!isSpectatorConn) {
         setConnectionState('connected');
         setError(null);
-        // Send player info
+        // Send player info including host role for guests to determine their role
         sendMessage({
           type: 'player_info',
-          payload: { name: playerName, timerSettings }
+          payload: { name: playerName, timerSettings, hostRole: playerRole }
         });
       }
     });
@@ -232,7 +246,7 @@ export function useLANMultiplayer(): LANMultiplayerReturn {
         setConnectionState('disconnected');
       }
     });
-  }, [handleMessage, sendMessage, playerName, timerSettings]);
+  }, [handleMessage, sendMessage, playerName, timerSettings, isHost, playerRole]);
 
   const createRoom = useCallback((role: PlayerRole, name: string, timer: TimerSettings) => {
     cleanup();

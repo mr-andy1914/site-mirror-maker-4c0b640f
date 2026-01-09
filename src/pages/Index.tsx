@@ -135,96 +135,102 @@ const Index = () => {
     onReceiveGameState(handleReceiveGameState);
   }, [onReceiveGameState, handleReceiveGameState]);
 
-  // Track last move for sending
-  const [prevPositions, setPrevPositions] = useState({ tigers, goats });
+  // Track previous positions for move detection
+  const prevPositionsRef = useRef({ tigers, goats });
   
   // Send game state after each move in LAN mode
   useEffect(() => {
-    // Only send if we just made a move
-    if (isLANMode && justMadeMove.current && !isSpectator) {
-      // Detect the move that was made
-      let moveAnimation: MoveAnimation | undefined;
-      
-      // Check for tiger move
-      const movedTiger = tigers.find((t, i) => {
-        const prev = prevPositions.tigers[i];
-        return prev && (t.position.row !== prev.position.row || t.position.col !== prev.position.col);
-      });
-      
-      if (movedTiger) {
-        const prevTiger = prevPositions.tigers.find(pt => 
-          !tigers.some(t => t.position.row === pt.position.row && t.position.col === pt.position.col)
-        );
-        if (prevTiger) {
-          // Check for capture
-          const rowDiff = Math.abs(movedTiger.position.row - prevTiger.position.row);
-          const colDiff = Math.abs(movedTiger.position.col - prevTiger.position.col);
-          let capturedAt: { row: number; col: number } | undefined;
-          
-          if (rowDiff === 2 || colDiff === 2) {
-            capturedAt = {
-              row: (movedTiger.position.row + prevTiger.position.row) / 2,
-              col: (movedTiger.position.col + prevTiger.position.col) / 2,
-            };
-          }
-          
-          moveAnimation = {
-            pieceType: 'tiger',
-            from: prevTiger.position,
-            to: movedTiger.position,
-            capturedAt,
-          };
-        }
-      } else {
-        // Check for goat move or placement
-        const movedGoat = goats.find((g, i) => {
-          if (i >= prevPositions.goats.length) return false; // New goat placed
-          const prev = prevPositions.goats[i];
-          return prev && (g.position.row !== prev.position.row || g.position.col !== prev.position.col);
-        });
-        
-        if (movedGoat) {
-          const prevGoat = prevPositions.goats.find(pg => 
-            !goats.some(g => g.position.row === pg.position.row && g.position.col === pg.position.col)
-          );
-          if (prevGoat) {
-            moveAnimation = {
-              pieceType: 'goat',
-              from: prevGoat.position,
-              to: movedGoat.position,
-            };
-          }
-        } else if (goats.length > prevPositions.goats.length) {
-          // New goat placed
-          const newGoat = goats[goats.length - 1];
-          moveAnimation = {
-            pieceType: 'goat',
-            from: newGoat.position, // Same position for placement
-            to: newGoat.position,
-          };
-        }
-      }
-      
-      sendGameState({
-        tigers,
-        goats,
-        goatsToPlace,
-        goatsCaptured,
-        currentTurn,
-        gameOver,
-        hostRole: isHost ? lanPlayerRole : undefined,
-        lastMove: moveAnimation,
-        timerSettings,
-        matchScore,
-        spectators,
-      });
-      
-      // Reset the flag after sending
-      justMadeMove.current = false;
+    // Only send if we just made a move (flag was set by wrappedHandleNodeClick)
+    if (!isLANMode || !justMadeMove.current || isSpectator) {
+      // Update prev positions even if we don't send
+      prevPositionsRef.current = { tigers: [...tigers], goats: [...goats] };
+      return;
     }
     
-    setPrevPositions({ tigers, goats });
-  }, [isLANMode, currentTurn, effectiveRole, tigers, goats, goatsToPlace, goatsCaptured, gameOver, sendGameState, isHost, lanPlayerRole, timerSettings, matchScore, spectators, isSpectator, prevPositions]);
+    console.log('[LAN] Sending game state after move, currentTurn:', currentTurn);
+    
+    // Detect the move that was made
+    let moveAnimation: MoveAnimation | undefined;
+    const prevPositions = prevPositionsRef.current;
+    
+    // Check for tiger move
+    const movedTiger = tigers.find((t, i) => {
+      const prev = prevPositions.tigers[i];
+      return prev && (t.position.row !== prev.position.row || t.position.col !== prev.position.col);
+    });
+    
+    if (movedTiger) {
+      const prevTiger = prevPositions.tigers.find(pt => 
+        !tigers.some(t => t.position.row === pt.position.row && t.position.col === pt.position.col)
+      );
+      if (prevTiger) {
+        // Check for capture
+        const rowDiff = Math.abs(movedTiger.position.row - prevTiger.position.row);
+        const colDiff = Math.abs(movedTiger.position.col - prevTiger.position.col);
+        let capturedAt: { row: number; col: number } | undefined;
+        
+        if (rowDiff === 2 || colDiff === 2) {
+          capturedAt = {
+            row: (movedTiger.position.row + prevTiger.position.row) / 2,
+            col: (movedTiger.position.col + prevTiger.position.col) / 2,
+          };
+        }
+        
+        moveAnimation = {
+          pieceType: 'tiger',
+          from: prevTiger.position,
+          to: movedTiger.position,
+          capturedAt,
+        };
+      }
+    } else {
+      // Check for goat move or placement
+      const movedGoat = goats.find((g, i) => {
+        if (i >= prevPositions.goats.length) return false; // New goat placed
+        const prev = prevPositions.goats[i];
+        return prev && (g.position.row !== prev.position.row || g.position.col !== prev.position.col);
+      });
+      
+      if (movedGoat) {
+        const prevGoat = prevPositions.goats.find(pg => 
+          !goats.some(g => g.position.row === pg.position.row && g.position.col === pg.position.col)
+        );
+        if (prevGoat) {
+          moveAnimation = {
+            pieceType: 'goat',
+            from: prevGoat.position,
+            to: movedGoat.position,
+          };
+        }
+      } else if (goats.length > prevPositions.goats.length) {
+        // New goat placed
+        const newGoat = goats[goats.length - 1];
+        moveAnimation = {
+          pieceType: 'goat',
+          from: newGoat.position, // Same position for placement
+          to: newGoat.position,
+        };
+      }
+    }
+    
+    sendGameState({
+      tigers,
+      goats,
+      goatsToPlace,
+      goatsCaptured,
+      currentTurn,
+      gameOver,
+      hostRole: isHost ? lanPlayerRole : undefined,
+      lastMove: moveAnimation,
+      timerSettings,
+      matchScore,
+      spectators,
+    });
+    
+    // Reset the flag and update prev positions
+    justMadeMove.current = false;
+    prevPositionsRef.current = { tigers: [...tigers], goats: [...goats] };
+  }, [isLANMode, tigers, goats, goatsToPlace, goatsCaptured, currentTurn, gameOver, sendGameState, isHost, lanPlayerRole, timerSettings, matchScore, spectators, isSpectator]);
 
   // Handle creating LAN room
   const handleCreateRoom = useCallback((role: PlayerRole, name: string, timer: TimerSettings) => {
