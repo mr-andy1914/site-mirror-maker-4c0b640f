@@ -400,7 +400,7 @@ const Index = () => {
                 </span>
               ) : isAIThinking ? (
                 <span className="text-xs sm:text-sm text-primary animate-pulse">
-                  AI thinking...
+                  Opponent thinking...
                 </span>
               ) : null}
             </div>

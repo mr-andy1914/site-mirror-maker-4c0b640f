@@ -88,9 +88,9 @@ export function useGameAI(difficulty: AIDifficulty = 'medium') {
   const shouldMakeSuboptimalMove = useCallback(() => {
     switch (difficulty) {
       case 'easy':
-        return Math.random() < 0.5; // 50% chance of suboptimal move
+        return Math.random() < 0.4; // 40% chance of suboptimal move
       case 'medium':
-        return Math.random() < 0.2; // 20% chance of suboptimal move
+        return Math.random() < 0.1; // 10% chance of suboptimal move
       case 'hard':
         return false; // Always optimal
     }
@@ -100,11 +100,11 @@ export function useGameAI(difficulty: AIDifficulty = 'medium') {
   const getLookaheadDepth = useCallback(() => {
     switch (difficulty) {
       case 'easy':
-        return 0; // No lookahead
-      case 'medium':
         return 1; // 1 move ahead
-      case 'hard':
+      case 'medium':
         return 2; // 2 moves ahead
+      case 'hard':
+        return 3; // 3 moves ahead for harder challenge
     }
   }, [difficulty]);
 

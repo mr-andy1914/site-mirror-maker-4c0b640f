@@ -97,28 +97,41 @@ export function GameBoard({
 
   // Detect moves internally (for local games)
   useEffect(() => {
-    // Check for tiger move
-    const movedTiger = tigers.find((t, i) => {
-      const prev = prevTigersRef.current[i];
-      return prev && (t.position.row !== prev.position.row || t.position.col !== prev.position.col);
-    });
+    // Skip if we have lastMove prop (animation handled by that)
+    if (lastMove) {
+      prevTigersRef.current = tigers;
+      prevGoatsRef.current = goats;
+      return;
+    }
     
-    if (movedTiger) {
+    // Check for tiger move - find the tiger that moved by comparing positions
+    let movedTiger: typeof tigers[0] | undefined;
+    let prevTigerPos: Position | undefined;
+    
+    for (const tiger of tigers) {
       const prevTiger = prevTigersRef.current.find(
-        t => tigers.some(curr => 
-          curr.position.row === t.position.row + (movedTiger.position.row - t.position.row) && 
-          curr.position.col === t.position.col + (movedTiger.position.col - t.position.col)
-        )
+        pt => !tigers.some(t => t.position.row === pt.position.row && t.position.col === pt.position.col)
       );
-      
       if (prevTiger) {
-        const piece: AnimatedPiece = {
-          ...movedTiger,
-          animatingFrom: prevTiger.position,
-        };
-        setAnimatingPiece(piece);
-        setTimeout(() => setAnimatingPiece(null), 350);
+        // This prevTiger no longer exists at its old position, find its new position
+        const newTiger = tigers.find(
+          t => !prevTigersRef.current.some(pt => pt.position.row === t.position.row && pt.position.col === t.position.col)
+        );
+        if (newTiger) {
+          movedTiger = newTiger;
+          prevTigerPos = prevTiger.position;
+          break;
+        }
       }
+    }
+    
+    if (movedTiger && prevTigerPos) {
+      const piece: AnimatedPiece = {
+        ...movedTiger,
+        animatingFrom: prevTigerPos,
+      };
+      setAnimatingPiece(piece);
+      setTimeout(() => setAnimatingPiece(null), 350);
     }
     
     // Check for captured goat
@@ -375,7 +388,7 @@ export function GameBoard({
       {isAIThinking && (
         <div className="absolute inset-0 flex items-center justify-center bg-background/50 rounded-xl sm:rounded-2xl">
           <div className="text-sm sm:text-lg font-display text-primary animate-pulse">
-            AI Thinking...
+            Opponent thinking...
           </div>
         </div>
       )}
