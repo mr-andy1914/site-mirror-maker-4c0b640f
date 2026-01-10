@@ -147,14 +147,15 @@ export function useLANMultiplayer(): LANMultiplayerReturn {
   }, []);
 
   const sendMessage = useCallback((message: PeerMessage) => {
-    if (connectionRef.current) {
-      if (connectionRef.current.open) {
-        console.log('[LAN] Sending message:', message.type);
-        connectionRef.current.send(message);
-      } else {
-        console.warn('[LAN] Connection not open, cannot send:', message.type);
-      }
+    console.log('[LAN] sendMessage called, type:', message.type, 'connection open:', connectionRef.current?.open);
+    
+    if (connectionRef.current && connectionRef.current.open) {
+      console.log('[LAN] Sending message via main connection:', message.type);
+      connectionRef.current.send(message);
+    } else {
+      console.warn('[LAN] Main connection not ready, message not sent:', message.type);
     }
+    
     // Also send to spectators if host
     spectatorConnectionsRef.current.forEach(conn => {
       if (conn.open) {
@@ -225,6 +226,7 @@ export function useLANMultiplayer(): LANMultiplayerReturn {
   }, []);
 
   const setupConnection = useCallback((conn: DataConnection, isSpectatorConn = false) => {
+    // Set connection ref BEFORE setting up event handlers
     if (isSpectatorConn) {
       spectatorConnectionsRef.current.push(conn);
     } else {
@@ -236,21 +238,23 @@ export function useLANMultiplayer(): LANMultiplayerReturn {
       if (!isSpectatorConn) {
         setConnectionState('connected');
         setError(null);
-        // Send player info including host role for guests to determine their role
-        // Use refs to get current values
-        sendMessage({
+        // Send player info directly through the connection (not via sendMessage which may have stale ref)
+        const playerInfoMessage: PeerMessage = {
           type: 'player_info',
           payload: { 
             name: playerNameRef.current, 
             timerSettings: timerSettingsRef.current, 
             hostRole: playerRoleRef.current 
           }
-        });
+        };
+        console.log('[LAN] Sending player_info:', playerInfoMessage.payload);
+        conn.send(playerInfoMessage);
       }
     });
 
     conn.on('data', (data) => {
       try {
+        console.log('[LAN] Raw data received:', data);
         handleMessage(data as PeerMessage, isSpectatorConn);
       } catch (e) {
         console.error('Failed to parse message:', e);
@@ -258,28 +262,35 @@ export function useLANMultiplayer(): LANMultiplayerReturn {
     });
 
     conn.on('close', () => {
-      console.log('Connection closed');
+      console.log('[LAN] Connection closed');
       if (!isSpectatorConn) {
         setConnectionState('disconnected');
       } else {
         spectatorConnectionsRef.current = spectatorConnectionsRef.current.filter(c => c !== conn);
-        setSpectators(prev => prev.slice(0, -1)); // Simple removal, could be improved
+        setSpectators(prev => prev.slice(0, -1));
       }
     });
 
     conn.on('error', (err) => {
-      console.error('Connection error:', err);
+      console.error('[LAN] Connection error:', err);
       if (!isSpectatorConn) {
-        setError('Connection error');
+        setError('Connection error: ' + err.message);
         setConnectionState('disconnected');
       }
     });
-  }, [handleMessage, sendMessage]);
+  }, [handleMessage]);
 
   const createRoom = useCallback((role: PlayerRole, name: string, timer: TimerSettings) => {
     cleanup();
     setError(null);
     setConnectionState('creating');
+    
+    // Set refs BEFORE creating peer (so they're available when connection opens)
+    isHostRef.current = true;
+    playerRoleRef.current = role;
+    playerNameRef.current = name;
+    timerSettingsRef.current = timer;
+    
     setIsHost(true);
     setPlayerRole(role);
     setPlayerName(name);
@@ -292,8 +303,11 @@ export function useLANMultiplayer(): LANMultiplayerReturn {
     const code = generateRoomCode();
     const peerId = `bagchal-${code}`;
 
+    console.log('[LAN] Creating room with peerId:', peerId);
+
     // Use PeerJS cloud with explicit config for better cross-network connectivity
     const peer = new Peer(peerId, {
+      debug: 2, // Enable debug logging
       config: {
         iceServers: [
           { urls: 'stun:stun.l.google.com:19302' },
@@ -306,14 +320,14 @@ export function useLANMultiplayer(): LANMultiplayerReturn {
     });
     peerRef.current = peer;
 
-    peer.on('open', () => {
-      console.log('Host peer opened with ID:', peerId);
+    peer.on('open', (id) => {
+      console.log('[LAN] Host peer opened with ID:', id);
       setRoomCode(code);
       setConnectionState('waiting');
     });
 
     peer.on('connection', (conn) => {
-      console.log('Incoming connection');
+      console.log('[LAN] Incoming connection from:', conn.peer);
       // Check if it's a spectator (metadata would indicate)
       const isSpectator = conn.metadata?.spectator === true;
       setupConnection(conn, isSpectator);
@@ -330,14 +344,25 @@ export function useLANMultiplayer(): LANMultiplayerReturn {
     });
 
     peer.on('error', (err) => {
-      console.error('Peer error:', err);
+      console.error('[LAN] Peer error:', err.type, err.message);
       if (err.type === 'unavailable-id') {
         setError('Room code in use, please try again');
         setConnectionState('idle');
+      } else if (err.type === 'network') {
+        setError('Network error - check your internet connection');
+        setConnectionState('idle');
+      } else if (err.type === 'server-error') {
+        setError('Server error - please try again');
+        setConnectionState('idle');
       } else {
-        setError('Failed to create room');
+        setError(`Failed to create room: ${err.type}`);
         setConnectionState('idle');
       }
+    });
+
+    peer.on('disconnected', () => {
+      console.log('[LAN] Peer disconnected from server, attempting reconnect...');
+      peer.reconnect();
     });
   }, [cleanup, setupConnection]);
 
@@ -345,18 +370,26 @@ export function useLANMultiplayer(): LANMultiplayerReturn {
     cleanup();
     setError(null);
     setConnectionState('joining');
+    
+    // Set refs BEFORE creating peer
+    isHostRef.current = false;
+    playerNameRef.current = name;
+    
     setIsHost(false);
     setPlayerName(name);
     setChatMessages([]);
 
     if (asSpectator) {
       setPlayerRole('spectator');
+      playerRoleRef.current = 'spectator';
     }
 
-    const peerId = `bagchal-${code}`;
+    const hostPeerId = `bagchal-${code}`;
+    console.log('[LAN] Joining room, connecting to:', hostPeerId);
 
     // Use PeerJS cloud with explicit config for better cross-network connectivity
     const peer = new Peer({
+      debug: 2, // Enable debug logging
       config: {
         iceServers: [
           { urls: 'stun:stun.l.google.com:19302' },
@@ -369,32 +402,35 @@ export function useLANMultiplayer(): LANMultiplayerReturn {
     });
     peerRef.current = peer;
 
-    peer.on('open', () => {
-      console.log('Joiner peer opened, connecting to:', peerId);
-      const conn = peer.connect(peerId, { 
+    peer.on('open', (myId) => {
+      console.log('[LAN] Joiner peer opened with ID:', myId, 'connecting to:', hostPeerId);
+      const conn = peer.connect(hostPeerId, { 
         reliable: true,
         metadata: { spectator: asSpectator }
       });
       
-      conn.on('open', () => {
-        // Send our info and whether we're a spectator
-        conn.send({
-          type: asSpectator ? 'spectator_join' : 'player_info',
-          payload: { name }
-        });
-      });
-      
+      // Set up connection handlers first
       setupConnection(conn, asSpectator);
+      
+      // The player_info will be sent in setupConnection's conn.on('open') handler
     });
 
     peer.on('error', (err) => {
-      console.error('Peer error:', err);
+      console.error('[LAN] Peer error:', err.type, err.message);
       if (err.type === 'peer-unavailable') {
-        setError('Room not found');
+        setError('Room not found - check the code and try again');
+      } else if (err.type === 'network') {
+        setError('Network error - check your internet connection');
+      } else if (err.type === 'server-error') {
+        setError('Server error - please try again');
       } else {
-        setError('Failed to join room');
+        setError(`Failed to join room: ${err.type}`);
       }
       setConnectionState('idle');
+    });
+
+    peer.on('disconnected', () => {
+      console.log('[LAN] Peer disconnected from server');
     });
   }, [cleanup, setupConnection]);
 
