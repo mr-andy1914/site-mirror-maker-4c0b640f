@@ -83,9 +83,18 @@ const Index = () => {
   } = useLANMultiplayer();
 
   const isLANMode = connectionState === 'connected';
-  const effectiveRole = lanPlayerRole || playerRole;
-  const isMyTurn = isLANMode && effectiveRole === currentTurn;
+  // Use playerRole from hook as primary source (it's set correctly for both host and guest)
+  // lanPlayerRole is a fallback/override for local UI state
+  const effectiveRole = playerRole || lanPlayerRole;
   const isSpectator = effectiveRole === 'spectator';
+  const isMyTurn = isLANMode && !isSpectator && effectiveRole === currentTurn;
+  
+  // Debug logging
+  useEffect(() => {
+    if (isLANMode) {
+      console.log('[Index] LAN Mode - playerRole:', playerRole, 'lanPlayerRole:', lanPlayerRole, 'effectiveRole:', effectiveRole, 'currentTurn:', currentTurn, 'isMyTurn:', isMyTurn);
+    }
+  }, [isLANMode, playerRole, lanPlayerRole, effectiveRole, currentTurn, isMyTurn]);
 
   // Turn timer
   const handleTimeUp = useCallback(() => {
@@ -288,9 +297,12 @@ const Index = () => {
   // Wrap handlers to check if it's player's turn in LAN mode
   const wrappedHandleNodeClick = useCallback((row: number, col: number) => {
     if (isLANMode && (!isMyTurn || isSpectator)) return;
-    // Mark that we're making a move so the sync effect knows to send state
-    justMadeMove.current = true;
-    handleNodeClick(row, col);
+    // handleNodeClick returns true if a move was made
+    const moveMade = handleNodeClick(row, col);
+    if (moveMade) {
+      // Mark that we made a move so the sync effect knows to send state
+      justMadeMove.current = true;
+    }
   }, [isLANMode, isMyTurn, isSpectator, handleNodeClick]);
 
   const wrappedHandlePieceSelect = useCallback((piece: any) => {
