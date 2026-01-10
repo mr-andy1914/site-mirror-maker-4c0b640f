@@ -266,9 +266,9 @@ export function useGameLogic() {
     }
   }, [currentTurn, gameMode, gameOver, isAITurn, isAIThinking, executeAIMove]);
 
-  const handleNodeClick = useCallback((row: number, col: number) => {
-    if (gameOver || isAIThinking) return;
-    if (isAITurn()) return; // Don't allow clicks during AI turn
+  const handleNodeClick = useCallback((row: number, col: number): boolean => {
+    if (gameOver || isAIThinking) return false;
+    if (isAITurn()) return false; // Don't allow clicks during AI turn
     
     if (currentTurn === 'goat' && goatsToPlace > 0 && !selectedPiece) {
       if (!isOccupied(row, col)) {
@@ -278,9 +278,10 @@ export function useGameLogic() {
         setCurrentTurn('tiger');
         playSound('place');
         setTimeout(() => checkWinCondition(goatsCaptured, tigers, newGoats, 'tiger'), 50);
-        return;
+        return true; // Move was successful
       } else {
         playSound('invalid');
+        return false;
       }
     }
     
@@ -334,11 +335,14 @@ export function useGameLogic() {
         setSelectedPiece(null);
         setCurrentTurn(prev => prev === 'tiger' ? 'goat' : 'tiger');
         setTimeout(() => checkWinCondition(newCapturedCount, newTigers, newGoats, playerType as 'tiger' | 'goat'), 50);
+        return true; // Move was successful
       } else {
         setSelectedPiece(null);
         playSound('invalid');
+        return false;
       }
     }
+    return false;
   }, [currentTurn, goatsToPlace, selectedPiece, isOccupied, getValidMoves, goatsCaptured, goats, tigers, gameOver, checkWinCondition, isAITurn, isAIThinking, playSound]);
 
   const handlePieceSelect = useCallback((piece: Piece) => {

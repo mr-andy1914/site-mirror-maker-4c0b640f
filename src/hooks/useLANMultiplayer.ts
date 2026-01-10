@@ -116,6 +116,22 @@ export function useLANMultiplayer(): LANMultiplayerReturn {
   const connectionRef = useRef<DataConnection | null>(null);
   const spectatorConnectionsRef = useRef<DataConnection[]>([]);
   const gameStateCallbackRef = useRef<((state: GameState) => void) | null>(null);
+  const playerRoleRef = useRef<PlayerRole | null>(null);
+  const playerNameRef = useRef('');
+  const timerSettingsRef = useRef<TimerSettings>({ enabled: false, seconds: 30 });
+  
+  // Keep refs in sync with state
+  useEffect(() => {
+    playerRoleRef.current = playerRole;
+  }, [playerRole]);
+  
+  useEffect(() => {
+    playerNameRef.current = playerName;
+  }, [playerName]);
+  
+  useEffect(() => {
+    timerSettingsRef.current = timerSettings;
+  }, [timerSettings]);
 
   const cleanup = useCallback(() => {
     spectatorConnectionsRef.current.forEach(conn => conn.close());
@@ -147,8 +163,14 @@ export function useLANMultiplayer(): LANMultiplayerReturn {
     });
   }, []);
 
+  // Use a ref to track isHost since it may not be updated when handleMessage is called
+  const isHostRef = useRef(false);
+  useEffect(() => {
+    isHostRef.current = isHost;
+  }, [isHost]);
+
   const handleMessage = useCallback((data: PeerMessage, fromSpectator = false) => {
-    console.log('[LAN] Received message:', data.type);
+    console.log('[LAN] Received message:', data.type, 'isHost:', isHostRef.current);
     
     switch (data.type) {
       case 'game_state':
@@ -181,15 +203,16 @@ export function useLANMultiplayer(): LANMultiplayerReturn {
         setTimerValue(data.payload.value);
         break;
       case 'player_info':
+        console.log('[LAN] Received player_info:', data.payload);
         setOpponentName(data.payload.name);
         if (!fromSpectator && data.payload.timerSettings) {
           setTimerSettings(data.payload.timerSettings);
           setTimerValue(data.payload.timerSettings.seconds);
         }
-        // Set guest's role based on host's role
-        if (!fromSpectator && data.payload.hostRole) {
+        // Set guest's role based on host's role (only for non-host, non-spectator)
+        if (!fromSpectator && data.payload.hostRole && !isHostRef.current) {
           const guestRole = data.payload.hostRole === 'tiger' ? 'goat' : 'tiger';
-          console.log('[LAN] Setting guest role to:', guestRole);
+          console.log('[LAN] Setting guest role to:', guestRole, 'because hostRole is:', data.payload.hostRole);
           setPlayerRole(guestRole);
         }
         break;
@@ -209,14 +232,19 @@ export function useLANMultiplayer(): LANMultiplayerReturn {
     }
 
     conn.on('open', () => {
-      console.log('[LAN] Connection opened, isHost:', isHost);
+      console.log('[LAN] Connection opened, isHost:', isHostRef.current, 'playerRole:', playerRoleRef.current);
       if (!isSpectatorConn) {
         setConnectionState('connected');
         setError(null);
         // Send player info including host role for guests to determine their role
+        // Use refs to get current values
         sendMessage({
           type: 'player_info',
-          payload: { name: playerName, timerSettings, hostRole: playerRole }
+          payload: { 
+            name: playerNameRef.current, 
+            timerSettings: timerSettingsRef.current, 
+            hostRole: playerRoleRef.current 
+          }
         });
       }
     });
@@ -246,7 +274,7 @@ export function useLANMultiplayer(): LANMultiplayerReturn {
         setConnectionState('disconnected');
       }
     });
-  }, [handleMessage, sendMessage, playerName, timerSettings, isHost, playerRole]);
+  }, [handleMessage, sendMessage]);
 
   const createRoom = useCallback((role: PlayerRole, name: string, timer: TimerSettings) => {
     cleanup();
@@ -264,7 +292,18 @@ export function useLANMultiplayer(): LANMultiplayerReturn {
     const code = generateRoomCode();
     const peerId = `bagchal-${code}`;
 
-    const peer = new Peer(peerId);
+    // Use PeerJS cloud with explicit config for better cross-network connectivity
+    const peer = new Peer(peerId, {
+      config: {
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' },
+          { urls: 'stun:stun2.l.google.com:19302' },
+          { urls: 'stun:stun3.l.google.com:19302' },
+          { urls: 'stun:stun4.l.google.com:19302' },
+        ]
+      }
+    });
     peerRef.current = peer;
 
     peer.on('open', () => {
@@ -316,7 +355,18 @@ export function useLANMultiplayer(): LANMultiplayerReturn {
 
     const peerId = `bagchal-${code}`;
 
-    const peer = new Peer();
+    // Use PeerJS cloud with explicit config for better cross-network connectivity
+    const peer = new Peer({
+      config: {
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' },
+          { urls: 'stun:stun2.l.google.com:19302' },
+          { urls: 'stun:stun3.l.google.com:19302' },
+          { urls: 'stun:stun4.l.google.com:19302' },
+        ]
+      }
+    });
     peerRef.current = peer;
 
     peer.on('open', () => {
