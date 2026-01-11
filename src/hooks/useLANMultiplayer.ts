@@ -327,34 +327,28 @@ export function useLANMultiplayer(): LANMultiplayerReturn {
 
     console.log('[LAN] Creating room with peerId:', peerId);
 
-    // Use PeerJS cloud with STUN + free TURN servers for cross-network connectivity
+    // Use PeerJS cloud with STUN + Open Relay TURN servers for cross-network connectivity
     const peer = new Peer(peerId, {
-      debug: 3, // Max debug for troubleshooting
+      debug: 3,
       config: {
         iceServers: [
           { urls: 'stun:stun.l.google.com:19302' },
           { urls: 'stun:stun1.l.google.com:19302' },
-          { urls: 'stun:stun.relay.metered.ca:80' },
-          // Metered.ca free TURN servers (more reliable)
+          // Open Relay Project - free public TURN servers
           {
-            urls: 'turn:global.relay.metered.ca:80',
-            username: 'e8dd65b92f6a1f3b2a3c5d6e',
-            credential: 'kW+5X8Qz3Y1B2C4D'
+            urls: 'turn:openrelay.metered.ca:80',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
           },
           {
-            urls: 'turn:global.relay.metered.ca:80?transport=tcp',
-            username: 'e8dd65b92f6a1f3b2a3c5d6e',
-            credential: 'kW+5X8Qz3Y1B2C4D'
+            urls: 'turn:openrelay.metered.ca:443',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
           },
           {
-            urls: 'turn:global.relay.metered.ca:443',
-            username: 'e8dd65b92f6a1f3b2a3c5d6e',
-            credential: 'kW+5X8Qz3Y1B2C4D'
-          },
-          {
-            urls: 'turns:global.relay.metered.ca:443?transport=tcp',
-            username: 'e8dd65b92f6a1f3b2a3c5d6e',
-            credential: 'kW+5X8Qz3Y1B2C4D'
+            urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
           }
         ],
         iceCandidatePoolSize: 10
@@ -429,34 +423,28 @@ export function useLANMultiplayer(): LANMultiplayerReturn {
     const hostPeerId = `bagchal-${code}`;
     console.log('[LAN] Joining room, connecting to:', hostPeerId);
 
-    // Use PeerJS cloud with STUN + free TURN servers for cross-network connectivity
+    // Use PeerJS cloud with STUN + Open Relay TURN servers for cross-network connectivity
     const peer = new Peer({
-      debug: 3, // Max debug for troubleshooting
+      debug: 3,
       config: {
         iceServers: [
           { urls: 'stun:stun.l.google.com:19302' },
           { urls: 'stun:stun1.l.google.com:19302' },
-          { urls: 'stun:stun.relay.metered.ca:80' },
-          // Metered.ca free TURN servers (more reliable)
+          // Open Relay Project - free public TURN servers
           {
-            urls: 'turn:global.relay.metered.ca:80',
-            username: 'e8dd65b92f6a1f3b2a3c5d6e',
-            credential: 'kW+5X8Qz3Y1B2C4D'
+            urls: 'turn:openrelay.metered.ca:80',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
           },
           {
-            urls: 'turn:global.relay.metered.ca:80?transport=tcp',
-            username: 'e8dd65b92f6a1f3b2a3c5d6e',
-            credential: 'kW+5X8Qz3Y1B2C4D'
+            urls: 'turn:openrelay.metered.ca:443',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
           },
           {
-            urls: 'turn:global.relay.metered.ca:443',
-            username: 'e8dd65b92f6a1f3b2a3c5d6e',
-            credential: 'kW+5X8Qz3Y1B2C4D'
-          },
-          {
-            urls: 'turns:global.relay.metered.ca:443?transport=tcp',
-            username: 'e8dd65b92f6a1f3b2a3c5d6e',
-            credential: 'kW+5X8Qz3Y1B2C4D'
+            urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
           }
         ],
         iceCandidatePoolSize: 10
