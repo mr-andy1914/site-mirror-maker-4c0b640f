@@ -305,16 +305,30 @@ export function useLANMultiplayer(): LANMultiplayerReturn {
 
     console.log('[LAN] Creating room with peerId:', peerId);
 
-    // Use PeerJS cloud with explicit config for better cross-network connectivity
+    // Use PeerJS cloud with STUN + TURN servers for cross-network connectivity
+    // TURN servers are essential for NAT traversal when STUN alone fails
     const peer = new Peer(peerId, {
-      debug: 2, // Enable debug logging
+      debug: 2,
       config: {
         iceServers: [
           { urls: 'stun:stun.l.google.com:19302' },
           { urls: 'stun:stun1.l.google.com:19302' },
-          { urls: 'stun:stun2.l.google.com:19302' },
-          { urls: 'stun:stun3.l.google.com:19302' },
-          { urls: 'stun:stun4.l.google.com:19302' },
+          // Free TURN servers from Open Relay Project
+          {
+            urls: 'turn:openrelay.metered.ca:80',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
+          },
+          {
+            urls: 'turn:openrelay.metered.ca:443',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
+          },
+          {
+            urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
+          }
         ]
       }
     });
@@ -387,16 +401,29 @@ export function useLANMultiplayer(): LANMultiplayerReturn {
     const hostPeerId = `bagchal-${code}`;
     console.log('[LAN] Joining room, connecting to:', hostPeerId);
 
-    // Use PeerJS cloud with explicit config for better cross-network connectivity
+    // Use PeerJS cloud with STUN + TURN servers for cross-network connectivity
     const peer = new Peer({
-      debug: 2, // Enable debug logging
+      debug: 2,
       config: {
         iceServers: [
           { urls: 'stun:stun.l.google.com:19302' },
           { urls: 'stun:stun1.l.google.com:19302' },
-          { urls: 'stun:stun2.l.google.com:19302' },
-          { urls: 'stun:stun3.l.google.com:19302' },
-          { urls: 'stun:stun4.l.google.com:19302' },
+          // Free TURN servers from Open Relay Project
+          {
+            urls: 'turn:openrelay.metered.ca:80',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
+          },
+          {
+            urls: 'turn:openrelay.metered.ca:443',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
+          },
+          {
+            urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
+          }
         ]
       }
     });
