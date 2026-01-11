@@ -334,21 +334,24 @@ export function useLANMultiplayer(): LANMultiplayerReturn {
         iceServers: [
           { urls: 'stun:stun.l.google.com:19302' },
           { urls: 'stun:stun1.l.google.com:19302' },
-          // Open Relay Project - free public TURN servers
+          { urls: 'stun:freeturn.net:3478' },
+          { urls: 'stun:freeturn.net:5349' },
+          // FreeTURN.net - reliable free TURN servers
           {
-            urls: 'turn:openrelay.metered.ca:80',
-            username: 'openrelayproject',
-            credential: 'openrelayproject'
+            urls: 'turn:freeturn.net:3478',
+            username: 'free',
+            credential: 'free'
           },
           {
-            urls: 'turn:openrelay.metered.ca:443',
-            username: 'openrelayproject',
-            credential: 'openrelayproject'
+            urls: 'turns:freeturn.net:5349',
+            username: 'free',
+            credential: 'free'
           },
+          // FreeSTUN.net backup
           {
-            urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-            username: 'openrelayproject',
-            credential: 'openrelayproject'
+            urls: 'turn:freestun.net:3478',
+            username: 'free',
+            credential: 'free'
           }
         ],
         iceCandidatePoolSize: 10
@@ -430,21 +433,24 @@ export function useLANMultiplayer(): LANMultiplayerReturn {
         iceServers: [
           { urls: 'stun:stun.l.google.com:19302' },
           { urls: 'stun:stun1.l.google.com:19302' },
-          // Open Relay Project - free public TURN servers
+          { urls: 'stun:freeturn.net:3478' },
+          { urls: 'stun:freeturn.net:5349' },
+          // FreeTURN.net - reliable free TURN servers
           {
-            urls: 'turn:openrelay.metered.ca:80',
-            username: 'openrelayproject',
-            credential: 'openrelayproject'
+            urls: 'turn:freeturn.net:3478',
+            username: 'free',
+            credential: 'free'
           },
           {
-            urls: 'turn:openrelay.metered.ca:443',
-            username: 'openrelayproject',
-            credential: 'openrelayproject'
+            urls: 'turns:freeturn.net:5349',
+            username: 'free',
+            credential: 'free'
           },
+          // FreeSTUN.net backup
           {
-            urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-            username: 'openrelayproject',
-            credential: 'openrelayproject'
+            urls: 'turn:freestun.net:3478',
+            username: 'free',
+            credential: 'free'
           }
         ],
         iceCandidatePoolSize: 10
